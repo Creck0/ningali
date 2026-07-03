@@ -1,6 +1,5 @@
-# Vehicle Booking & Monitoring System — PT Tambang Nikel
-
-A web application for managing operational vehicle bookings across the head office, branch office, and 6 mine sites, monitoring fuel consumption, service schedules, and vehicle usage history, with a multi-level approval workflow before any vehicle can be used.
+# NINGALI 
+Ngingali is A web application for managing operational vehicle bookings across the head office, branch office, and 6 mine sites, monitoring fuel consumption, service schedules, and vehicle usage history, with a multi-level approval workflow before any vehicle can be used.
 
 ---
 
