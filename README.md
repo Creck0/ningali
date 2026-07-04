@@ -1,5 +1,6 @@
-# Ningali 
-Ngingali is A web application for managing operational vehicle bookings across the head office, branch office, and 6 mine sites, monitoring fuel consumption, service schedules, and vehicle usage history, with a multi-level approval workflow before any vehicle can be used.
+# Vehicle Booking & Monitoring System — PT Tambang Nikel
+
+A web application for managing operational vehicle bookings across the head office, branch office, and 6 mine sites, monitoring fuel consumption, service schedules, and vehicle usage history, with a multi-level approval workflow before any vehicle can be used.
 
 ---
 
@@ -245,101 +246,37 @@ npm run dev
 
 ## 9. Troubleshooting (Backend)
 
-Common errors when setting up the Laravel backend locally, and how to fix each one.
+Quick fixes for the errors you'll most likely hit when setting this up.
 
-### `composer: command not found`
-Composer itself isn't installed on your machine. Install it globally first:
+### `composer` or `php` not found
+Means PHP/Composer isn't installed yet. Install PHP 8.3+ and Composer for your OS, then check with `php -v` and `composer -v`.
+
+### `.env` missing / `APP_KEY` errors
+You forgot to copy the env file and generate a key:
 ```bash
-# Linux/macOS
-curl -sS https://getcomposer.org/installer | php
-sudo mv composer.phar /usr/local/bin/composer
-
-# Windows
-# Download and run Composer-Setup.exe from https://getcomposer.org/download/
-```
-Verify with `composer --version`, then re-run `composer install` inside `backend/`.
-
-### `php: command not found`
-PHP itself isn't installed. Install PHP 8.3+ (with common extensions: `mbstring`, `xml`, `curl`, `pdo_mysql`, `sqlite3`, `zip`, `gd`) for your OS, e.g.:
-```bash
-# Ubuntu/Debian
-sudo apt install php8.3 php8.3-cli php8.3-mbstring php8.3-xml php8.3-curl php8.3-mysql php8.3-sqlite3 php8.3-zip
-
-# macOS (Homebrew)
-brew install php
-```
-Verify with `php -v`.
-
-### `Class "..." not found` / `vendor/autoload.php` missing
-The Composer dependencies haven't been installed (or `vendor/` was deleted/not included when copying the project). Run:
-```bash
-cd backend
-composer install
-```
-
-### `SQLSTATE[HY000] [2002] Connection refused` (running `php artisan migrate`, `serve`, or any login)
-Laravel can't reach MySQL. This means either MySQL isn't running, or the `.env` credentials don't match. Two ways to fix:
-
-**Option A — use MySQL:**
-1. Make sure the MySQL service is actually running:
-   ```bash
-   sudo systemctl status mysql   # Linux
-   sudo systemctl start mysql
-   # or start MySQL from XAMPP/Laragon if you use those
-   ```
-2. Create the database if it doesn't exist yet:
-   ```bash
-   mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS fleet_app;"
-   ```
-3. Double-check `backend/.env` matches your local MySQL setup:
-   ```
-   DB_CONNECTION=mysql
-   DB_HOST=127.0.0.1
-   DB_PORT=3306
-   DB_DATABASE=fleet_app
-   DB_USERNAME=root
-   DB_PASSWORD=your_mysql_password
-   ```
-
-**Option B — skip MySQL entirely, use SQLite (simplest for local dev):**
-```env
-# in backend/.env
-DB_CONNECTION=sqlite
-```
-```bash
-cd backend
-touch database/database.sqlite
-php artisan migrate --seed
-php artisan serve
-```
-
-### `.env` file missing / `APP_KEY` empty errors
-The `.env` file isn't committed to the repo on purpose — copy it from the example and generate a fresh app key:
-```bash
-cd backend
 cp .env.example .env
 php artisan key:generate
 ```
 
-### `SQLSTATE[HY000] [1049] Unknown database`
-The database named in `DB_DATABASE` doesn't exist yet. Create it (see Option A step 2 above), or switch to SQLite (Option B).
+### `SQLSTATE[HY000] [2002] Connection refused`
+Laravel can't reach MySQL — either it's not running, or your `.env` DB settings are wrong. Fastest fix: skip MySQL entirely and use SQLite instead.
+```env
+# backend/.env
+DB_CONNECTION=sqlite
+```
+```bash
+touch database/database.sqlite
+php artisan migrate --seed
+```
 
-### `Base table or view not found` when logging in or loading data
-Migrations haven't been run yet (or ran without seeding demo accounts):
+### Login works but no data shows up / "table not found"
+You skipped seeding. Run:
 ```bash
 php artisan migrate --seed
 ```
 
-### CORS error in the browser console (`has been blocked by CORS policy`)
-The frontend's origin isn't in the backend's allow-list. Check `backend/.env`:
-```env
-CORS_ALLOWED_ORIGINS=http://localhost:5173
-SANCTUM_STATEFUL_DOMAINS=localhost,localhost:5173,127.0.0.1
-```
-Make sure the port matches whatever `npm run dev` actually prints (Vite may pick a different port if 5173 is taken).
-
-### Login succeeds but every other request returns 401 Unauthorized
-Check `frontend/.env` — `VITE_API_URL` must point at your running Laravel server (default `http://localhost:8000/api`), and the frontend dev server must be restarted after changing `.env` (Vite only reads env files on startup).
+### CORS error in the browser
+Check `backend/.env` — `CORS_ALLOWED_ORIGINS` needs to match the URL your frontend is actually running on (default `http://localhost:5173`).
 
 ---
 
