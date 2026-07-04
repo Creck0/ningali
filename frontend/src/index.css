@@ -1,0 +1,57 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  @apply bg-base text-ink font-body antialiased;
+}
+
+::selection {
+  background-color: theme('colors.brand.100');
+}
+
+.tag-mono {
+  font-family: 'JetBrains Mono', monospace;
+  letter-spacing: 0.02em;
+}
+
+.input-select {
+  @apply w-full px-3 py-2.5 rounded-lg border border-base-border bg-base-card text-sm text-ink focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-shadow;
+}
+
+/* Signature texture: topographic contour lines, echoing the mine-site terrain
+   this system tracks vehicles across. Used sparingly — sidebar footer, the
+   login hero panel, and empty states — never as a general-purpose pattern. */
+.bg-contour {
+  background-color: theme('colors.base.DEFAULT');
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240' viewBox='0 0 240 240'%3E%3Cg fill='none' stroke='%232F6F5E' stroke-opacity='0.10' stroke-width='1.4'%3E%3Cpath d='M-20 60 Q 40 20 100 55 T 260 45'/%3E%3Cpath d='M-20 100 Q 40 60 100 95 T 260 85'/%3E%3Cpath d='M-20 140 Q 40 100 100 135 T 260 125'/%3E%3Cpath d='M-20 180 Q 40 140 100 175 T 260 165'/%3E%3Cpath d='M-20 220 Q 40 180 100 215 T 260 205'/%3E%3C/g%3E%3C/svg%3E");
+  background-size: 240px 240px;
+}
+
+.bg-contour-dark {
+  background-color: theme('colors.ink.DEFAULT');
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240' viewBox='0 0 240 240'%3E%3Cg fill='none' stroke='%23FFFFFF' stroke-opacity='0.06' stroke-width='1.4'%3E%3Cpath d='M-20 60 Q 40 20 100 55 T 260 45'/%3E%3Cpath d='M-20 100 Q 40 60 100 95 T 260 85'/%3E%3Cpath d='M-20 140 Q 40 100 100 135 T 260 125'/%3E%3Cpath d='M-20 180 Q 40 140 100 175 T 260 165'/%3E%3Cpath d='M-20 220 Q 40 180 100 215 T 260 205'/%3E%3C/g%3E%3C/svg%3E");
+  background-size: 240px 240px;
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes slideIn {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
