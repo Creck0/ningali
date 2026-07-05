@@ -1,4 +1,4 @@
-# Vehicle Booking & Monitoring System — PT SUKSES TAMBANG REZEKI
+# Vehicle Booking & Monitoring System - PT SUKSES TAMBANG REZEKI
 
 A web application for managing operational vehicle bookings across the head office, branch office, and 6 mine sites, monitoring fuel consumption, service schedules, and vehicle usage history, with a multi-level approval workflow before any vehicle can be used.
 
