@@ -1,10 +1,10 @@
-import { Fuel, Wrench, Plus, Car, AlertTriangle } from "lucide-react";
+import { Fuel, Wrench, Plus, Car } from "lucide-react";
 import Card from "../components/ui/Card";
 import PageHeader from "../components/ui/PageHeader";
 import EmptyState from "../components/ui/EmptyState";
 import { ModalShell, ModalActions, Field } from "../components/ui/Modal";
 import { useData } from "../context/DataContext";
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 
 const statusStyle = {
   available: "bg-success-100 text-success-700",
@@ -23,12 +23,13 @@ const tabs = [
   { key: "service", label: "Jadwal Service" },
 ];
 
-// Auto-detected (not stored anywhere) — read straight from real service_logs
-// data every time this page renders, so it's always in sync with the DB,
-// but it never writes anything back or changes the vehicle's actual status.
 const TODAY = new Date();
 const SOON_WINDOW_DAYS = 7;
 
+// Purely a display hint (the "Servis lewat X hari" badge). The actual
+// auto-maintenance decision — and remembering that an admin overrode it back
+// to "available" — is handled and persisted by the backend now, so this stays
+// in sync across logins/devices instead of resetting on every page load.
 function getServiceAlert(vehicleLabel, serviceLogs) {
   const logs = serviceLogs.filter((s) => s.vehicle === vehicleLabel && s.nextDue);
   if (logs.length === 0) return null;
@@ -38,9 +39,16 @@ function getServiceAlert(vehicleLabel, serviceLogs) {
     return !earliest || due < earliest ? due : earliest;
   }, null);
 
+  const dueKey = soonest.toISOString().slice(0, 10);
   const diffDays = Math.ceil((soonest - TODAY) / (1000 * 60 * 60 * 24));
-  if (diffDays < 0) return { level: "overdue", label: `Servis lewat ${Math.abs(diffDays)} hari` };
-  if (diffDays <= SOON_WINDOW_DAYS) return { level: "soon", label: diffDays === 0 ? "Servis jatuh tempo hari ini" : `Servis dalam ${diffDays} hari` };
+  if (diffDays < 0) return { level: "overdue", label: `Servis lewat ${Math.abs(diffDays)} hari`, dueKey };
+  if (diffDays <= SOON_WINDOW_DAYS) {
+    return {
+      level: "soon",
+      label: diffDays === 0 ? "Servis jatuh tempo hari ini" : `Servis dalam ${diffDays} hari`,
+      dueKey,
+    };
+  }
   return null;
 }
 
@@ -48,25 +56,31 @@ export default function Vehicles() {
   const { vehicles, fuelLogs, serviceLogs, addFuelLog, addServiceLog, updateVehicleStatus } = useData();
   const [tab, setTab] = useState("vehicles");
   const [modal, setModal] = useState(null);
+  const [statusError, setStatusError] = useState("");
+  const [busyVehicleId, setBusyVehicleId] = useState(null);
 
-  const autoMaintainedRef = useRef(new Set());
-  useEffect(() => {
-    vehicles.forEach((v) => {
-      if (v.status !== "available") return;
-      if (autoMaintainedRef.current.has(v.id)) return;
-      const alert = getServiceAlert(`${v.code} · ${v.plate}`, serviceLogs);
-      if (alert?.level !== "overdue") return;
-
-      autoMaintainedRef.current.add(v.id);
-      updateVehicleStatus(v.id, "maintenance").catch(() => {
-        autoMaintainedRef.current.delete(v.id);
-      });
-    });
-  }, [vehicles, serviceLogs]);
+  async function handleStatusChange(vehicleId, status) {
+    setBusyVehicleId(vehicleId);
+    setStatusError("");
+    try {
+      await updateVehicleStatus(vehicleId, status);
+    } catch (err) {
+      setStatusError(
+        err.response?.data?.message ||
+          "Gagal menyimpan perubahan status ke server. Status akan kembali seperti semula."
+      );
+    } finally {
+      setBusyVehicleId(null);
+    }
+  }
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Kendaraan" subtitle="Monitoring status armada, konsumsi BBM, dan jadwal service." />
+      <PageHeader title="Kendaraan" subtitle="Monitoring status Kendaraan, konsumsi BBM, dan jadwal service." />
+
+      {statusError && (
+        <div className="bg-danger-100 text-danger-700 text-sm px-3 py-2.5 rounded-lg">{statusError}</div>
+      )}
 
       <div className="flex gap-2 border-b border-base-border overflow-x-auto">
         {tabs.map((t) => (
@@ -88,7 +102,10 @@ export default function Vehicles() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
             {vehicles.map((v) => {
-              const alert = getServiceAlert(`${v.code} · ${v.plate}`, serviceLogs);
+              const rawAlert = getServiceAlert(`${v.code} · ${v.plate}`, serviceLogs);
+              const acknowledged =
+                v.status === "available" && rawAlert?.level === "overdue" && v.maintenanceOverrideKey === rawAlert.dueKey;
+              const alert = acknowledged ? null : rawAlert;
               return (
                 <Card key={v.id} className="p-5">
                   <div className="flex items-start justify-between mb-3">
@@ -105,20 +122,11 @@ export default function Vehicles() {
                     <p>{v.type} · {v.ownership}</p>
                     <p>{v.region}</p>
                   </div>
-                  {alert && (
-                    <div
-                      className={`flex items-center gap-1.5 text-xs font-medium rounded-lg px-2.5 py-2 mb-3 ${
-                        alert.level === "overdue" ? "bg-danger-100 text-danger-700" : "bg-ore-100 text-ore-600"
-                      }`}
-                    >
-                      <AlertTriangle size={13} />
-                      {alert.label}
-                    </div>
-                  )}
                   <select
                     value={v.status}
-                    onChange={(e) => updateVehicleStatus(v.id, e.target.value)}
-                    className="input-select text-xs py-2"
+                    disabled={busyVehicleId === v.id}
+                    onChange={(e) => handleStatusChange(v.id, e.target.value)}
+                    className="input-select text-xs py-2 disabled:opacity-60"
                   >
                     <option value="available">Tersedia</option>
                     <option value="in_use">Dipakai</option>
@@ -146,7 +154,6 @@ export default function Vehicles() {
             <EmptyState icon={Fuel} title="Belum ada catatan BBM" message="Catat pengisian bahan bakar untuk mulai memantau konsumsi tiap kendaraan." />
           ) : (
             <>
-              {/* Mobile cards */}
               <div className="grid grid-cols-1 gap-3 sm:hidden">
                 {fuelLogs.map((f) => (
                   <Card key={f.id} className="p-4">
@@ -161,7 +168,6 @@ export default function Vehicles() {
                 ))}
               </div>
 
-              {/* Desktop table */}
               <Card className="hidden sm:block overflow-x-auto">
                 <table className="w-full text-sm min-w-[600px]">
                   <thead>
@@ -206,7 +212,6 @@ export default function Vehicles() {
             <EmptyState icon={Wrench} title="Belum ada catatan service" message="Catat riwayat service untuk memantau jadwal perawatan tiap kendaraan." />
           ) : (
             <>
-              {/* Mobile cards */}
               <div className="grid grid-cols-1 gap-3 sm:hidden">
                 {serviceLogs.map((s) => (
                   <Card key={s.id} className="p-4">
@@ -220,7 +225,6 @@ export default function Vehicles() {
                 ))}
               </div>
 
-              {/* Desktop table */}
               <Card className="hidden sm:block overflow-x-auto">
                 <table className="w-full text-sm min-w-[640px]">
                   <thead>
