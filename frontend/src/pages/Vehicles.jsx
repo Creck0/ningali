@@ -1,4 +1,4 @@
-import { Fuel, Wrench, Plus, Car } from "lucide-react";
+import { Fuel, Wrench, Plus, Car, AlertTriangle } from "lucide-react";
 import Card from "../components/ui/Card";
 import PageHeader from "../components/ui/PageHeader";
 import EmptyState from "../components/ui/EmptyState";
@@ -122,6 +122,16 @@ export default function Vehicles() {
                     <p>{v.type} · {v.ownership}</p>
                     <p>{v.region}</p>
                   </div>
+                  {alert && (
+                    <div
+                      className={`flex items-center gap-1.5 text-xs font-medium rounded-lg px-2.5 py-2 mb-3 ${
+                        alert.level === "overdue" ? "bg-danger-100 text-danger-700" : "bg-ore-100 text-ore-600"
+                      }`}
+                    >
+                      <AlertTriangle size={13} />
+                      {alert.label}
+                    </div>
+                  )}
                   <select
                     value={v.status}
                     disabled={busyVehicleId === v.id}
