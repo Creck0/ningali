@@ -99,7 +99,11 @@ class VehicleController extends Controller
 
         foreach ($logs as $log) {
             $due = Carbon::parse($log->next_service_due);
-            if (! ($due->isPast() || $due->isToday())) {
+
+            // Explicit check: has THIS service's due date actually arrived yet?
+            // If not, leave it alone for now and move on to check the next
+            // scheduled service date — don't act on anything that isn't due yet.
+            if (! $this->isServiceDue($due)) {
                 continue;
             }
 
@@ -112,6 +116,11 @@ class VehicleController extends Controller
         }
 
         return null;
+    }
+
+    private function isServiceDue(Carbon $due): bool
+    {
+        return $due->isPast() || $due->isToday();
     }
 
     private function format(Vehicle $v): array
