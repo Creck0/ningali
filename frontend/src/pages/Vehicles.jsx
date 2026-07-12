@@ -26,29 +26,44 @@ const tabs = [
 const TODAY = new Date();
 const SOON_WINDOW_DAYS = 7;
 
-// Purely a display hint (the "Servis lewat X hari" badge). The actual
-// auto-maintenance decision — and remembering that an admin overrode it back
-// to "available" — is handled and persisted by the backend now, so this stays
-// in sync across logins/devices instead of resetting on every page load.
-function getServiceAlert(vehicleLabel, serviceLogs) {
+// Considers every service log for a vehicle (not just the latest one), skips
+// only the specific overdue instance that's already been acknowledged
+// (maintenanceOverrideKey), and returns whichever remaining schedule is most
+// urgent: any still-overdue one first, otherwise the nearest upcoming one
+// within the H-7 window.
+function getServiceAlert(vehicleLabel, serviceLogs, maintenanceOverrideKey) {
   const logs = serviceLogs.filter((s) => s.vehicle === vehicleLabel && s.nextDue);
   if (logs.length === 0) return null;
 
-  const soonest = logs.reduce((earliest, log) => {
-    const due = new Date(log.nextDue);
-    return !earliest || due < earliest ? due : earliest;
-  }, null);
+  const candidates = logs
+    .map((log) => {
+      const due = new Date(log.nextDue);
+      const dueKey = due.toISOString().slice(0, 10);
+      const diffDays = Math.ceil((due - TODAY) / (1000 * 60 * 60 * 24));
+      return { dueKey, diffDays };
+    })
+    .filter((c) => !(c.diffDays < 0 && c.dueKey === maintenanceOverrideKey));
 
-  const dueKey = soonest.toISOString().slice(0, 10);
-  const diffDays = Math.ceil((soonest - TODAY) / (1000 * 60 * 60 * 24));
-  if (diffDays < 0) return { level: "overdue", label: `Servis lewat ${Math.abs(diffDays)} hari`, dueKey };
-  if (diffDays <= SOON_WINDOW_DAYS) {
+  if (candidates.length === 0) return null;
+
+  const overdue = candidates.filter((c) => c.diffDays < 0).sort((a, b) => a.diffDays - b.diffDays);
+  if (overdue.length > 0) {
+    const c = overdue[0];
+    return { level: "overdue", label: `Servis lewat ${Math.abs(c.diffDays)} hari`, dueKey: c.dueKey };
+  }
+
+  const soon = candidates
+    .filter((c) => c.diffDays >= 0 && c.diffDays <= SOON_WINDOW_DAYS)
+    .sort((a, b) => a.diffDays - b.diffDays);
+  if (soon.length > 0) {
+    const c = soon[0];
     return {
       level: "soon",
-      label: diffDays === 0 ? "Servis jatuh tempo hari ini" : `Servis dalam ${diffDays} hari`,
-      dueKey,
+      label: c.diffDays === 0 ? "Servis jatuh tempo hari ini" : `Servis dalam ${c.diffDays} hari`,
+      dueKey: c.dueKey,
     };
   }
+
   return null;
 }
 
@@ -76,7 +91,7 @@ export default function Vehicles() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Kendaraan" subtitle="Monitoring status Kendaraan, konsumsi BBM, dan jadwal service." />
+      <PageHeader title="Kendaraan" subtitle="Monitoring status armada, konsumsi BBM, dan jadwal service." />
 
       {statusError && (
         <div className="bg-danger-100 text-danger-700 text-sm px-3 py-2.5 rounded-lg">{statusError}</div>
@@ -102,10 +117,7 @@ export default function Vehicles() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
             {vehicles.map((v) => {
-              const rawAlert = getServiceAlert(`${v.code} · ${v.plate}`, serviceLogs);
-              const acknowledged =
-                v.status === "available" && rawAlert?.level === "overdue" && v.maintenanceOverrideKey === rawAlert.dueKey;
-              const alert = acknowledged ? null : rawAlert;
+              const alert = getServiceAlert(`${v.code} · ${v.plate}`, serviceLogs, v.maintenanceOverrideKey);
               return (
                 <Card key={v.id} className="p-5">
                   <div className="flex items-start justify-between mb-3">
