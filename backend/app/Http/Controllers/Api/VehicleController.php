@@ -29,14 +29,21 @@ class VehicleController extends Controller
             'status' => ['required', Rule::in(['available', 'in_use', 'maintenance'])],
         ]);
 
-        $overdueKey = $this->overdueKey($vehicle);
+        // Only touch the acknowledgement when the admin sets the vehicle back
+        // to "available":
+        //  - still overdue  -> remember this exact overdue instance as acknowledged
+        //  - no longer overdue -> nothing to acknowledge, clear any stale flag
+        // Manually switching to "in_use" or "maintenance" afterwards does NOT
+        // wipe the acknowledgement — otherwise flipping it to maintenance to
+        // test something (or genuinely doing maintenance) would make the
+        // "Servis lewat X hari" notice reappear even though it was already
+        // dealt with. It only comes back for a genuinely new overdue service log.
+        if ($request->status === 'available') {
+            $overdueKey = $this->overdueKey($vehicle);
+            $vehicle->maintenance_override_key = $overdueKey;
+        }
 
-        // If the admin is explicitly setting this vehicle back to "available"
-        // while it's still overdue for service, remember that specific overdue
-        // instance was acknowledged, so the auto-maintenance check below won't
-        // immediately flip it back. Any other status clears the acknowledgement.
         $vehicle->status = $request->status;
-        $vehicle->maintenance_override_key = ($request->status === 'available' && $overdueKey) ? $overdueKey : null;
         $vehicle->save();
 
         ActivityLogger::log(
@@ -66,13 +73,7 @@ class VehicleController extends Controller
             return;
         }
 
-        $ackKey = $vehicle->maintenance_override_key?->format('Y-m-d');
-        if ($ackKey === $overdueKey) {
-            return; // this exact overdue instance was already acknowledged
-        }
-
         $vehicle->status = 'maintenance';
-        $vehicle->maintenance_override_key = null;
         $vehicle->save();
 
         ActivityLogger::log(
@@ -85,18 +86,32 @@ class VehicleController extends Controller
 
     private function overdueKey(Vehicle $vehicle): ?string
     {
-        $soonest = ServiceLog::where('vehicle_id', $vehicle->id)
+        // Walk every service log with a due date, earliest first. Return the
+        // first one that's actually overdue AND hasn't already been
+        // acknowledged. This way, acknowledging one overdue schedule doesn't
+        // permanently hide a *different* overdue schedule that comes after it.
+        $ackKey = $vehicle->maintenance_override_key?->format('Y-m-d');
+
+        $logs = ServiceLog::where('vehicle_id', $vehicle->id)
             ->whereNotNull('next_service_due')
             ->orderBy('next_service_due')
-            ->value('next_service_due');
+            ->get();
 
-        if (! $soonest) {
-            return null;
+        foreach ($logs as $log) {
+            $due = Carbon::parse($log->next_service_due);
+            if (! ($due->isPast() || $due->isToday())) {
+                continue;
+            }
+
+            $dueKey = $due->format('Y-m-d');
+            if ($dueKey === $ackKey) {
+                continue;
+            }
+
+            return $dueKey;
         }
 
-        $due = Carbon::parse($soonest);
-
-        return $due->isPast() || $due->isToday() ? $due->format('Y-m-d') : null;
+        return null;
     }
 
     private function format(Vehicle $v): array
